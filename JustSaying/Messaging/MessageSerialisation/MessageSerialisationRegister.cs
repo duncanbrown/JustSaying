@@ -6,11 +6,18 @@ namespace JustSaying.Messaging.MessageSerialisation
 {
     public class MessageSerialisationRegister : IMessageSerialisationRegister
     {
+        private readonly Func<Type, string> _getMessageTypeString;
+
+        public MessageSerialisationRegister(Func<Type, string> getMessageTypeString)
+        {
+            _getMessageTypeString = getMessageTypeString;
+        }
+
         private readonly Dictionary<string, TypeSerialiser> _map = new Dictionary<string, TypeSerialiser>();
 
         public void AddSerialiser<T>(IMessageSerialiser serialiser) where T : Message
         {
-            var keyname = typeof(T).Name;
+            var keyname = _getMessageTypeString(typeof(T));
             if (!_map.ContainsKey(keyname))
             {
                 _map.Add(keyname, new TypeSerialiser(typeof(T), serialiser));
@@ -28,7 +35,7 @@ namespace JustSaying.Messaging.MessageSerialisation
                 }
 
                 var matchedType = formatter.Value.Type;
-                if (!string.Equals(matchedType.Name, stringType, StringComparison.CurrentCultureIgnoreCase))
+                if (!string.Equals(_getMessageTypeString(matchedType), stringType, StringComparison.CurrentCultureIgnoreCase))
                 {
                     continue;
                 }
@@ -42,7 +49,7 @@ namespace JustSaying.Messaging.MessageSerialisation
 
         public string Serialise(Message message, bool serializeForSnsPublishing)
         {
-            var formatter = _map[message.GetType().Name];
+            var formatter = _map[_getMessageTypeString(message.GetType())];
             return formatter.Serialiser.Serialise(message, serializeForSnsPublishing);
         }
 

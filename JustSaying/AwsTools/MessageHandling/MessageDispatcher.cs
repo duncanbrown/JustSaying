@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Amazon.SQS;
@@ -20,6 +20,7 @@ namespace JustSaying.AwsTools.MessageHandling
         private readonly Action<Exception, SQSMessage> _onError;
         private readonly HandlerMap _handlerMap;
         private readonly IMessageBackoffStrategy _messageBackoffStrategy;
+        private readonly Func<Type, string> _getMessageTypeString;
 
         private static ILogger _log;
 
@@ -30,7 +31,8 @@ namespace JustSaying.AwsTools.MessageHandling
             Action<Exception, SQSMessage> onError,
             HandlerMap handlerMap,
             ILoggerFactory loggerFactory,
-            IMessageBackoffStrategy messageBackoffStrategy)
+            IMessageBackoffStrategy messageBackoffStrategy,
+            Func<Type, string> getMessageTypeString)
         {
             _queue = queue;
             _serialisationRegister = serialisationRegister;
@@ -39,6 +41,7 @@ namespace JustSaying.AwsTools.MessageHandling
             _handlerMap = handlerMap;
             _log = loggerFactory.CreateLogger("JustSaying");
             _messageBackoffStrategy = messageBackoffStrategy;
+            _getMessageTypeString = getMessageTypeString;
         }
 
         public async Task DispatchMessage(SQSMessage message)
@@ -86,7 +89,7 @@ namespace JustSaying.AwsTools.MessageHandling
 
                 if (typedMessage != null)
                 {
-                    _messagingMonitor.HandleException(typedMessage.GetType().Name);
+                    _messagingMonitor.HandleException(_getMessageTypeString(typedMessage.GetType()));
                 }
 
                 _onError(ex, message);
@@ -116,7 +119,7 @@ namespace JustSaying.AwsTools.MessageHandling
             var handlerSucceeded = await handler(message).ConfigureAwait(false);
 
             watch.Stop();
-            _log.LogTrace($"Handled message - MessageType: {message.GetType().Name}");
+            _log.LogTrace($"Handled message - MessageType: {_getMessageTypeString(message.GetType())}");
             _messagingMonitor.HandleTime(watch.ElapsedMilliseconds);
 
             return handlerSucceeded;

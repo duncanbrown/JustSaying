@@ -11,6 +11,14 @@ namespace JustSaying
 {
     public static class JustSayingFluentlyExtensions
     {
+        public static JustSayingFluentlyLogging WithCustomMessageTypeStringProvider(
+            this JustSayingFluentlyLogging logging, Func<Type, string> f)
+        {
+            logging.GetMessageTypeString = f;
+            return logging;
+        }
+
+
         public static IMayWantOptionalSettings InRegion(this JustSayingFluentlyLogging logging, string region) => InRegions(logging, region);
 
         public static IMayWantOptionalSettings InRegions(this JustSayingFluentlyLogging logging, params string[] regions) => InRegions(logging, regions as IEnumerable<string>);
@@ -27,13 +35,13 @@ namespace JustSaying
 
             config.Validate();
 
-            var messageSerialisationRegister = new MessageSerialisationRegister();
+            var messageSerialisationRegister = new MessageSerialisationRegister(logging.GetMessageTypeString);
             var justSayingBus = new JustSayingBus(config, messageSerialisationRegister, logging.LoggerFactory);
 
             var awsClientFactoryProxy = new AwsClientFactoryProxy(() => CreateMeABus.DefaultClientFactory());
 
             var amazonQueueCreator = new AmazonQueueCreator(awsClientFactoryProxy, logging.LoggerFactory);
-            var bus = new JustSayingFluently(justSayingBus, amazonQueueCreator, awsClientFactoryProxy, logging.LoggerFactory);
+            var bus = new JustSayingFluently(justSayingBus, amazonQueueCreator, awsClientFactoryProxy, logging.LoggerFactory, logging.GetMessageTypeString);
 
             bus
                 .WithMonitoring(new NullOpMessageMonitor())

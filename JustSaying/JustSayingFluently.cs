@@ -33,10 +33,14 @@ namespace JustSaying
         private IMessageSerialisationFactory _serialisationFactory;
         private Func<INamingStrategy> _busNamingStrategyFunc;
         private readonly ILoggerFactory _loggerFactory;
+        private readonly Func<Type, string> _getMessageTypeString;
 
-        protected internal JustSayingFluently(IAmJustSaying bus, IVerifyAmazonQueues queueCreator, IAwsClientFactoryProxy awsClientFactoryProxy, ILoggerFactory loggerFactory)
+        protected internal JustSayingFluently(IAmJustSaying bus, IVerifyAmazonQueues queueCreator,
+            IAwsClientFactoryProxy awsClientFactoryProxy, ILoggerFactory loggerFactory,
+            Func<Type, string> getMessageTypeString)
         {
             _loggerFactory = loggerFactory;
+            _getMessageTypeString = getMessageTypeString;
             _log = _loggerFactory.CreateLogger("JustSaying");
             Bus = bus;
             _amazonQueueCreator = queueCreator;
@@ -90,7 +94,7 @@ namespace JustSaying
                     topicName,
                     _awsClientFactoryProxy.GetAwsClientFactory().GetSnsClient(RegionEndpoint.GetBySystemName(region)),
                     Bus.SerialisationRegister,
-                    _loggerFactory, snsWriteConfig)
+                    _loggerFactory, snsWriteConfig, _getMessageTypeString)
                 {
                     MessageResponseLogger = Bus.Config.MessageResponseLogger
                 };
@@ -314,7 +318,7 @@ namespace JustSaying
 
             foreach (var region in Bus.Config.Regions)
             {
-                var queue = _amazonQueueCreator.EnsureTopicExistsWithQueueSubscribedAsync(region, Bus.SerialisationRegister, _subscriptionConfig).GetAwaiter().GetResult();
+                var queue = _amazonQueueCreator.EnsureTopicExistsWithQueueSubscribedAsync(region, Bus.SerialisationRegister, _subscriptionConfig, _getMessageTypeString).GetAwaiter().GetResult();
                 CreateSubscriptionListener<T>(region, queue);
                 _log.LogInformation($"Created SQS topic subscription - Topic: {_subscriptionConfig.Topic}, QueueName: {_subscriptionConfig.QueueName}");
             }
@@ -339,7 +343,7 @@ namespace JustSaying
 
         private void CreateSubscriptionListener<T>(string region, SqsQueueBase queue) where T : Message
         {
-            var sqsSubscriptionListener = new SqsNotificationListener(queue, Bus.SerialisationRegister, Bus.Monitor, _loggerFactory, _subscriptionConfig.OnError, Bus.MessageLock, _subscriptionConfig.MessageBackoffStrategy);
+            var sqsSubscriptionListener = new SqsNotificationListener(queue, Bus.SerialisationRegister, Bus.Monitor, _loggerFactory, _getMessageTypeString, _subscriptionConfig.OnError, Bus.MessageLock, _subscriptionConfig.MessageBackoffStrategy);
             sqsSubscriptionListener.Subscribers.Add(new Subscriber(typeof(T)));
             Bus.AddNotificationSubscriber(region, sqsSubscriptionListener);
 

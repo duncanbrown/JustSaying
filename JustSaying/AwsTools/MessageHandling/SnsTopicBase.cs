@@ -14,6 +14,7 @@ namespace JustSaying.AwsTools.MessageHandling
     public abstract class SnsTopicBase : IMessagePublisher
     {
         private readonly IMessageSerialisationRegister _serialisationRegister; // ToDo: Grrr...why is this here even. GET OUT!
+        private readonly Func<Type, string> _getMessageTypeString;
         private readonly SnsWriteConfiguration _snsWriteConfiguration;
         public Action<MessageResponse, Message> MessageResponseLogger { get; set; }
         public string Arn { get; protected set; }
@@ -21,20 +22,22 @@ namespace JustSaying.AwsTools.MessageHandling
         private readonly ILogger _eventLog;
         private readonly ILogger _log;
 
-        protected SnsTopicBase(IMessageSerialisationRegister serialisationRegister, ILoggerFactory loggerFactory)
+        protected SnsTopicBase(IMessageSerialisationRegister serialisationRegister, ILoggerFactory loggerFactory, Func<Type, string> getMessageTypeString)
         {
             _serialisationRegister = serialisationRegister;
+            _getMessageTypeString = getMessageTypeString;
             _log = loggerFactory.CreateLogger("JustSaying");
             _eventLog = loggerFactory.CreateLogger("EventLog");
         }
 
         protected SnsTopicBase(IMessageSerialisationRegister serialisationRegister,
-            ILoggerFactory loggerFactory, SnsWriteConfiguration snsWriteConfiguration)
+            ILoggerFactory loggerFactory, SnsWriteConfiguration snsWriteConfiguration, Func<Type, string> getMessageTypeString)
         {
             _serialisationRegister = serialisationRegister;
             _log = loggerFactory.CreateLogger("JustSaying");
             _eventLog = loggerFactory.CreateLogger("EventLog");
             _snsWriteConfiguration = snsWriteConfiguration;
+            _getMessageTypeString = getMessageTypeString;
         }
 
         public abstract Task<bool> ExistsAsync();
@@ -111,7 +114,7 @@ namespace JustSaying.AwsTools.MessageHandling
         private PublishRequest BuildPublishRequest(Message message)
         {
             var messageToSend = _serialisationRegister.Serialise(message, serializeForSnsPublishing: true);
-            var messageType = message.GetType().Name;
+            var messageType = _getMessageTypeString(message.GetType());
             return new PublishRequest
             {
                 TopicArn = Arn,

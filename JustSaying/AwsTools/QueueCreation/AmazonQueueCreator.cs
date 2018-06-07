@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Amazon;
 using Amazon.SQS;
@@ -19,7 +20,7 @@ namespace JustSaying.AwsTools.QueueCreation
             _loggerFactory = loggerFactory;
         }
 
-        public async Task<SqsQueueByName> EnsureTopicExistsWithQueueSubscribedAsync(string region, IMessageSerialisationRegister serialisationRegister, SqsReadConfiguration queueConfig)
+        public async Task<SqsQueueByName> EnsureTopicExistsWithQueueSubscribedAsync(string region, IMessageSerialisationRegister serialisationRegister, SqsReadConfiguration queueConfig, Func<Type, string> getMessageTypeString)
         {
             var regionEndpoint = RegionEndpoint.GetBySystemName(region);
             var sqsClient = _awsClientFactory.GetAwsClientFactory().GetSqsClient(regionEndpoint);
@@ -36,7 +37,7 @@ namespace JustSaying.AwsTools.QueueCreation
             }
             else
             {
-                var eventTopic = new SnsTopicByName(queueConfig.PublishEndpoint, snsClient, serialisationRegister, _loggerFactory);
+                var eventTopic = new SnsTopicByName(queueConfig.PublishEndpoint, snsClient, serialisationRegister, _loggerFactory, getMessageTypeString);
                 await eventTopic.CreateAsync().ConfigureAwait(false);
 
                 await EnsureQueueIsSubscribedToTopic(eventTopic, queue).ConfigureAwait(false);

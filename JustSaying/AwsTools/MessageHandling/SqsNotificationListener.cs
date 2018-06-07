@@ -21,6 +21,7 @@ namespace JustSaying.AwsTools.MessageHandling
     {
         private readonly SqsQueueBase _queue;
         private readonly IMessageMonitor _messagingMonitor;
+        private readonly Func<Type, string> _getMessageTypeString;
         private readonly List<string> _requestMessageAttributeNames = new List<string>();
 
         private readonly MessageDispatcher _messageDispatcher;
@@ -36,18 +37,20 @@ namespace JustSaying.AwsTools.MessageHandling
             IMessageSerialisationRegister serialisationRegister,
             IMessageMonitor messagingMonitor,
             ILoggerFactory loggerFactory,
+            Func<Type, string> getMessageTypeString,
             Action<Exception, Amazon.SQS.Model.Message> onError = null,
             IMessageLockAsync messageLock = null,
             IMessageBackoffStrategy messageBackoffStrategy = null)
         {
             _queue = queue;
             _messagingMonitor = messagingMonitor;
+            _getMessageTypeString = getMessageTypeString;
             onError = onError ?? ((ex, message) => { });
             _log = loggerFactory.CreateLogger("JustSaying");
 
             _messageProcessingStrategy = new DefaultThrottledThroughput(_messagingMonitor);
             _messageHandlerWrapper = new MessageHandlerWrapper(messageLock, _messagingMonitor);
-            _messageDispatcher = new MessageDispatcher(queue, serialisationRegister, messagingMonitor, onError, _handlerMap, loggerFactory, messageBackoffStrategy);
+            _messageDispatcher = new MessageDispatcher(queue, serialisationRegister, messagingMonitor, onError, _handlerMap, loggerFactory, messageBackoffStrategy, getMessageTypeString);
 
             Subscribers = new Collection<ISubscriber>();
 
@@ -77,7 +80,7 @@ namespace JustSaying.AwsTools.MessageHandling
             if (_handlerMap.ContainsKey(typeof(T)))
             {
                 throw new NotSupportedException(
-                    $"The handler for '{typeof(T).Name}' messages on this queue has already been registered.");
+                    $"The handler for '{typeof(T).FullName}' messages on this queue has already been registered.");
             }
 
             Subscribers.Add(new Subscriber(typeof(T)));

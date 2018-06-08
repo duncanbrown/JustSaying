@@ -86,7 +86,7 @@ namespace JustSaying
 
             Bus.SerialisationRegister.AddSerialiser<T>(_serialisationFactory.GetSerialiser<T>());
 
-            var topicName = namingStrategy.GetTopicName(_subscriptionConfig.BaseTopicName, GetMessageTypeName<T>());
+            var topicName = namingStrategy.GetTopicName(_subscriptionConfig.BaseTopicName, GetMessageTypeName<T>(), typeof(T));
             foreach (var region in Bus.Config.Regions)
             {
                 // TODO pass region down into topic creation for when we have foreign topics so we can generate the arn
@@ -124,7 +124,7 @@ namespace JustSaying
             configBuilder(config);
 
             var messageTypeName = typeof(T).ToTopicName();
-            var queueName = GetNamingStrategy().GetQueueName(new SqsReadConfiguration(SubscriptionType.PointToPoint){BaseQueueName = config.QueueName}, messageTypeName);
+            var queueName = GetNamingStrategy().GetQueueName(new SqsReadConfiguration(SubscriptionType.PointToPoint){BaseQueueName = config.QueueName}, messageTypeName, typeof(T));
 
             Bus.SerialisationRegister.AddSerialiser<T>(_serialisationFactory.GetSerialiser<T>());
 
@@ -314,7 +314,7 @@ namespace JustSaying
         private IHaveFulfilledSubscriptionRequirements TopicHandler<T>() where T : Message
         {
             var messageTypeName = GetMessageTypeName<T>();
-            ConfigureSqsSubscriptionViaTopic(messageTypeName);
+            ConfigureSqsSubscriptionViaTopic(messageTypeName, typeof(T));
 
             foreach (var region in Bus.Config.Regions)
             {
@@ -329,7 +329,7 @@ namespace JustSaying
         private IHaveFulfilledSubscriptionRequirements PointToPointHandler<T>() where T : Message
         {
             var messageTypeName = GetMessageTypeName<T>();
-            ConfigureSqsSubscription(messageTypeName);
+            ConfigureSqsSubscription(messageTypeName, typeof(T));
 
             foreach (var region in Bus.Config.Regions)
             {
@@ -358,19 +358,19 @@ namespace JustSaying
             }
         }
 
-        private void ConfigureSqsSubscriptionViaTopic(string messageTypeName)
+        private void ConfigureSqsSubscriptionViaTopic(string messageTypeName, Type messageType)
         {
             var namingStrategy = GetNamingStrategy();
-            _subscriptionConfig.PublishEndpoint = namingStrategy.GetTopicName(_subscriptionConfig.BaseTopicName, messageTypeName);
-            _subscriptionConfig.Topic = namingStrategy.GetTopicName(_subscriptionConfig.BaseTopicName, messageTypeName);
-            _subscriptionConfig.QueueName = namingStrategy.GetQueueName(_subscriptionConfig, messageTypeName);
+            _subscriptionConfig.PublishEndpoint = namingStrategy.GetTopicName(_subscriptionConfig.BaseTopicName, messageTypeName, messageType);
+            _subscriptionConfig.Topic = namingStrategy.GetTopicName(_subscriptionConfig.BaseTopicName, messageTypeName, messageType);
+            _subscriptionConfig.QueueName = namingStrategy.GetQueueName(_subscriptionConfig, messageTypeName, messageType);
             _subscriptionConfig.Validate();
         }
 
-        private void ConfigureSqsSubscription(string messageTypeName)
+        private void ConfigureSqsSubscription(string messageTypeName, Type messageType)
         {
             _subscriptionConfig.ValidateSqsConfiguration();
-            _subscriptionConfig.QueueName = GetNamingStrategy().GetQueueName(_subscriptionConfig, messageTypeName);
+            _subscriptionConfig.QueueName = GetNamingStrategy().GetQueueName(_subscriptionConfig, messageTypeName, messageType);
         }
 
         /// <summary>
